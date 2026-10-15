@@ -56,15 +56,15 @@ chunk 0x23 (rwID_PITEXDICTIONARY)
     u32 numImages                       mip levels, each half the size of the previous (checked on all files)
     numImages x chunk 0x18 (IMAGE)
       chunk 0x01 (STRUCT, 16 bytes): u32 width, height, depth (4, 8 or 32), stride
-      palette: (4 << depth) bytes = 2^depth RGBA entries (depth 4 or 8 only)
       pixels: height * stride bytes (4 bit: two pixels per byte, low nibble = left pixel)
+      palette: (4 << depth) bytes = 2^depth RGBA entries (depth 4 or 8 only), stored AFTER the pixels
     chunk 0x06 (TEXTURE)
       chunk 0x01: u32 filtering | addressing (low byte filter mode, bits 8-11 U and 12-15 V addressing; 0x1104 typical)
       chunk 0x02 texture name, chunk 0x02 mask name (NUL padded to 4 bytes)
       chunk 0x03 extension (empty in all files)
 ```
-Fonts (and some UI images) have an all zero palette: the pixel values are intensity, drawn as white with that alpha
-(`pitexd.Image.rgba` does this; the font atlas `FGDC20` renders correctly with it). Over all 100 files there are 9752 images with
+(Earlier versions of this document and of `pitexd.py` had palette and pixels the other way round: that decoded the
+fonts "correctly" as intensity images by accident but turned every colour icon, e.g. `POWERUPICONS.TXD`, into noise.) Over all 100 files there are 9752 images with
 8 bit, 2759 with 4 bit and 1195 with 32 bit (RGBA bytes) pixels. The statically linked RenderWare toolkit `rtpitexd`
 (`RtPITexDictionaryStreamRead`, found with the FID database) is what reads these in the game; the layout above matches it.
 

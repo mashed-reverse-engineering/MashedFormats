@@ -12,8 +12,8 @@ RtPITexDictionaryStreamRead; see FORMATS.md):
       u32 numImages                                     number of mip levels
       numImages x chunk 0x18 (IMAGE)
         chunk 0x01 (STRUCT, 16 bytes): u32 width, height, depth, stride
-        palette  (1 << depth) RGBA entries, only if depth <= 8
-        pixels   height * stride bytes (8 bit indexed, or 32 bit RGBA)
+        pixels   height * stride bytes (8/4 bit indexed, or 32 bit RGBA)
+        palette  (1 << depth) RGBA entries AFTER the pixels, only if depth <= 8
       chunk 0x06 (TEXTURE)
         chunk 0x01 (STRUCT, 4 bytes): u32 filtering | addressing  (low byte filter mode, bits 8..11 U, 12..15 V addressing)
         chunk 0x02 (STRING) texture name, chunk 0x02 (STRING) mask name   (NUL padded to 4 bytes)
@@ -48,13 +48,10 @@ class Image:
 
     def build(self):
         st = struct.pack("<4I", self.width, self.height, self.depth, self.stride)
-        return _chunk(IMAGE, self.stamp, _chunk(STRUCT, self.struct_stamp, st) + self.palette + self.pixels)
+        return _chunk(IMAGE, self.stamp, _chunk(STRUCT, self.struct_stamp, st) + self.pixels + self.palette)
 
     def rgba(self):
-        """Pixels as a flat RGBA byte string (width*height*4). Images whose palette is entirely zero (the fonts)
-        carry their data as an 8/4 bit intensity in the pixel indices: shown as white with that alpha."""
-        if self.depth in (4, 8) and not any(self.palette):
-            return self._intensity_rgba()
+        """Pixels as a flat RGBA byte string (width*height*4)."""
         out = bytearray()
         if self.depth == 32:
             for y in range(self.height):
@@ -72,18 +69,6 @@ class Image:
                     out += self.palette[i:i + 4]
         else:
             raise ValueError(f"unsupported depth {self.depth}")
-        return bytes(out)
-
-    def _intensity_rgba(self):
-        out = bytearray()
-        for y in range(self.height):
-            for x in range(self.width):
-                if self.depth == 8:
-                    v = self.pixels[y * self.stride + x]
-                else:
-                    b = self.pixels[y * self.stride + x // 2]
-                    v = ((b >> 4) if x & 1 else (b & 15)) * 17
-                out += bytes((255, 255, 255, v))
         return bytes(out)
 
     def png(self):
@@ -145,7 +130,7 @@ class PITexDict:
                 if s != 28 + pal + h * stride:
                     raise ValueError(f"image size mismatch at {pos:#x}")
                 a = pos + 40  # image header 12 + struct chunk 12 + 16
-                images.append(Image(w, h, d, stride, data[a:a + pal], data[a + pal:a + pal + h * stride], st, st2))
+                images.append(Image(w, h, d, stride, data[a + h * stride:a + h * stride + pal], data[a:a + h * stride], st, st2))
                 pos += 12 + s
             t, s, st = _hdr(data, pos)
             if t != TEXTURE:

@@ -47,9 +47,6 @@ class Synthetic(unittest.TestCase):
         self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
         w, h = struct.unpack(">II", png[16:24])
         self.assertEqual((w, h), (2, 2))
-        # zero palette = intensity image (fonts): white with the index as alpha
-        im = pitexd.Image(2, 1, 8, 2, bytes(1024), bytes([0, 200]), 0, 0)
-        self.assertEqual(im.rgba(), bytes([255, 255, 255, 0, 255, 255, 255, 200]))
         # normal palette
         pal = bytes([1, 2, 3, 4]) + bytes([9, 8, 7, 6]) + bytes(1016)
         im = pitexd.Image(2, 1, 8, 2, pal, bytes([1, 0]), 0, 0)
